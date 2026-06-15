@@ -1,0 +1,7 @@
+xai-sdk
+python-dotenv
+pypdf
+rich
+pydantic
+tinydb
+requests
