@@ -1,96 +1,186 @@
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
+from langchain.agents import create_agent
 from pypdf import PdfReader
-from langchain.tools import tool
-from langchain_core.messages import (
-    HumanMessage,
-    AIMessage,
-    SystemMessage,
-    ToolMessage
-)
-import os
 from pathlib import Path
+from langchain.tools import tool
 from rich import print
-
-
-
-
-
-
+from langchain_core.messages import HumanMessage, ToolMessage
+import os
 
 load_dotenv()
-
-# modle======================================
-
 
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     api_key=os.getenv("GROQ_API_KEY")
 )
 
-# pdf tool==================================
-@tool 
-def extract_pdf(pdf_path):
-    """Read a PDF and return its text content."""
+@tool
+def extract_pdf(pdf_name: str) -> str:
+    """
+    Find and read a PDF from the notes folder.
+    Pass a keyword from the filename like 'DBMS', 'math'.
+    If you don't know the filename, pass 'list' to see all available PDFs.
+    Returns: page count and full text content of the PDF.
+    """
+    notes_path = Path("notes")
+    available = [p.name for p in notes_path.glob("*.pdf")]
 
-    if not Path(pdf_path).exists():
-        return f"Error: PDF '{pdf_path}' was not found."
-    
-    reader = PdfReader(pdf_path)
+    if not available:
+        return "No PDFs found in notes folder."
 
+    if pdf_name.lower() == "list":
+        return f"Available PDFs: {available}"
 
-    text = ""
+    for pdf in notes_path.glob("*.pdf"):
+        if pdf_name.lower() in pdf.name.lower():
+            reader = PdfReader(pdf)
+            page_count = len(reader.pages)
+            text = ""
+            for page in reader.pages:
+                text += page.extract_text() or ""
+            return f"File: {pdf.name} | Pages: {page_count}\n\n{text[:8000]}"
 
+    return f"No PDF matching '{pdf_name}' found. Available PDFs: {available}"
 
-    for page in reader.pages:
-        page_text = page.extract_text()
-        if page_text:
-            text += page_text + "\n"
+print("MODEL:", llm.model_name)
 
-    return text
+# create_agent
+agent = create_agent(
+    model=llm,
+    tools=[extract_pdf],
+    system_prompt="""
+You are a helpful student assistant.
 
-tools={
-    "extract_pdf": extract_pdf
-}
-messages = []
-llm_with_tool = llm.bind_tools([extract_pdf])
+Only use the extract_pdf tool when the user explicitly asks about a PDF, notes, study material, or document contents.
 
+For greetings like 'hi', 'hello', or general questions, answer normally without using tools.
+"""
+)
 
-
+print("how can i help you?")
 
 while True:
-    prompt = input("You: ")
+    user_input = input("you: ")
 
-    if prompt.lower() == "exit":
+    if user_input.lower() == "exit":
         break
 
-    messages.append(HumanMessage(content=prompt))
+    print("Calling agent...")
 
-    result = llm_with_tool.invoke(messages)
+    try:
+        result = agent.invoke({
+            "messages": [
+                {"role": "user", "content": user_input}
+            ]
+        })
 
-    if result.tool_calls:
+        last_message = result["messages"][-1]
+        print("Bot:", last_message.content)
 
-     for tool_call in result.tool_calls:
-
-        tool_name = tool_call["name"]
-        tool_args = tool_call["args"]
-        print(f"\nTool wants to run: {tool_name}")
-        print(f"Arguments: {tool_args}")
-
-        approval = input("Approve tool call? (y/n): ")
-
-        if approval.lower() != "y":
-            print("Tool execution cancelled.")
-            continue
-
-        tool_result = tools[tool_name].invoke(tool_args)
-        messages.append(ToolMessage(
-            content=tool_result,
-            tool_call_id=tool_call["id"]))
-
-        print(messages)
+    except Exception as e:
+        print("ERROR:", repr(e))
 
 
 
-# respose= llm.invoke("hello")
-# print(respose.content)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# tools_map = {"extract_pdf": extract_pdf}
+# llm_with_tool = llm.bind_tools([extract_pdf])
+# messages = []
+
+# while True:
+#     prompt = input("You: ")
+#     if prompt.lower() == "exit":
+#         break
+
+#     messages.append(HumanMessage(content=prompt))
+
+#     result = llm_with_tool.invoke(messages)
+#     messages.append(result)
+
+#     if result.tool_calls:
+#         # LLM wants to use a tool — ask for approval first
+#         for tool_call in result.tool_calls:
+#             print(f"\nTool: {tool_call['name']} → {tool_call['args']}")
+#             approval = input("Approve? (y/n): ")
+
+#             if approval.lower() == "y":
+#                 tool_fn = tools_map.get(tool_call["name"])
+#                 tool_result = tool_fn.invoke(tool_call["args"]) if tool_fn else "Unknown tool."
+#             else:
+#                 tool_result = "User denied tool execution."
+
+#             messages.append(ToolMessage(
+#                 content=str(tool_result),
+#                 tool_call_id=tool_call["id"]
+#             ))
+
+#         # LLM sees tool result and gives final answer
+#         final = llm_with_tool.invoke(messages)
+#         messages.append(final)
+#         print("\nAI:", final.content)
+
+#     else:
+#         # LLM answered directly, no tool needed
+#         print("\nAI:", result.content)
