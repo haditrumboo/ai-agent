@@ -1,11 +1,12 @@
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain.agents import create_agent
+from langchain_core.messages import HumanMessage
 from pypdf import PdfReader
 from pathlib import Path
 from langchain.tools import tool
 from rich import print
-from langchain_core.messages import HumanMessage, ToolMessage
+from langchain_core.messages import HumanMessage, AIMessage
 import os
 
 load_dotenv()
@@ -60,9 +61,17 @@ For greetings like 'hi', 'hello', or general questions, answer normally without 
 
 print("how can i help you?")
 
+messages = []
+
 while True:
     user_input = input("you: ")
 
+    if user_input == "":
+        print("type anything")
+        break
+    messages.append(
+        HumanMessage(content=user_input)
+    )
     if user_input.lower() == "exit":
         break
 
@@ -70,12 +79,13 @@ while True:
 
     try:
         result = agent.invoke({
-            "messages": [
-                {"role": "user", "content": user_input}
-            ]
+            "messages": messages
         })
 
+
         last_message = result["messages"][-1]
+        
+
         print("Bot:", last_message.content)
 
     except Exception as e:
