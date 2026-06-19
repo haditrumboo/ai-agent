@@ -123,7 +123,7 @@ You are a helpful student assistant.
 
 Only use the extract_pdf tool when the user explicitly asks about a PDF, notes, study material, or document contents.
 
-For greetings like 'hi', 'hello', or general questions, answer normally without using tools.
+For greetings like 'hi', 'hello', or general questions, answer normally without using tools..
 """
 )
 
